@@ -5,7 +5,14 @@
 
 ## Требования
 
-Требует пакет `scrapy`.
+Python-пакеты:
+ * `scrapy` - Скраппер
+ * `psycopg2` - PostgreSQL драйвер
+ * `dotenv` - Загрузка переменных окржения из `.env` файла
+
+```shell
+python3 -m pip install scrapy psycopg2 dotenv
+```
 
 ## Запуск
 

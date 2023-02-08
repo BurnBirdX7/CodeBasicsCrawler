@@ -8,6 +8,10 @@ class CourseSpider(scrapy.Spider):
     start_urls = ['https://code-basics.com/ru/language_categories/programming',
                   'https://code-basics.com/ru/language_categories/layouting']
 
+    def __init__(self, callback, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.callback = callback
+
     def parse(self, response):
         main_block = response.xpath('//main')
         links = main_block.xpath('//div[contains(@class, "card-title")]/a')
@@ -39,10 +43,9 @@ class CourseSpider(scrapy.Spider):
         item['education_plan'] = plan_selector.xpath('div/ul/li/a/text()').getall()
 
         if not long_title.startswith(title) or long_title.endswith('начинающих'):
-            item['entry_level'] = 'Базовый'
+            item['entry_level'] = 'Basic'
         else:
-            item['entry_level'] = 'Средний'
+            item['entry_level'] = 'Middle'
 
-
-
+        self.callback(item)
         return item
