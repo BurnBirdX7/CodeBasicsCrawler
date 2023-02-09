@@ -3,7 +3,7 @@ from os import getenv
 class Config:
     # Connection info
     DB_HOST = 'localhost'
-    DB_PORT = '49153'
+    DB_PORT = '5432'
     DB_USER = 'postgres'
     DB_PASSWORD = getenv('DB_PASSWORD')
     DB_NAME = 'platform'
@@ -18,3 +18,6 @@ class Config:
     DB_LEVEL_TABLE = 'level'
     DB_SOURCE_TABLE = 'source'
 
+    # Entry levels' names in the database (Level Table)
+    LEVEL_BASIC = 'CodeBasics_Basic'
+    LEVEL_MIDDLE = 'CodeBasics_Middle'

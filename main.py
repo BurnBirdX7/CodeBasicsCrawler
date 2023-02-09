@@ -36,13 +36,13 @@ def get_platform_id(db):
         packed_id = crs.fetchone()
 
         if packed_id is not None:
-            print(packed_id[0])
+            print('platform id:', packed_id[0])
             return packed_id[0]
 
     # If platform wasn't found - insert it
     with db.cursor() as crs:
         crs.execute(INSERT_TEXT, (Config.PLATFORM_URL,))
-        packed_id = crs.fetchone()[0]
+        packed_id = crs.fetchone()
         if packed_id is not None:
             db.commit()
             return packed_id[0]
@@ -50,8 +50,52 @@ def get_platform_id(db):
         raise RuntimeError(f'Cannot acquire ID of the platform with \'{Config.PLATFORM_URL}\' url')
 
 
-def get_levels_ids(db) -> Dict[str, int]:
-    pass # TODO: Implement
+def insert_level(db, level: str):
+    insert_text = f"""
+    INSERT INTO {Config.DB_SCHEMA}.{Config.DB_LEVEL_TABLE} (text)
+    VALUES (%s)
+    ON CONFLICT DO NOTHING
+    """
+
+    with db.cursor() as crs:
+        crs.execute(insert_text, (level,))
+        db.commit()
+
+
+def get_levels_ids(db, nested: bool = False) -> Dict[str, int]:
+    print('levels:')
+    select_text = f"""
+    SELECT id, text
+    FROM {Config.DB_SCHEMA}.{Config.DB_LEVEL_TABLE}
+    WHERE text = %s or text = %s
+    """
+
+    wanted_levels = [Config.LEVEL_BASIC, Config.LEVEL_MIDDLE]
+
+    with db.cursor() as crs:
+        crs.execute(select_text, wanted_levels)
+        rows = crs.fetchall()
+
+        dic = {}
+        for id, text in rows:
+            print(f'{id=}, {text=}')
+            if text == Config.LEVEL_BASIC:
+                dic['Basic'] = id
+            else:
+                dic['Middle'] = id
+
+        if len(dic) < 2:
+            if nested:
+                raise RuntimeError('Cannot acquire entry level information from database')
+
+            for level in wanted_levels:
+                if level not in dic:
+                    insert_level(db, level)
+
+            return get_levels_ids(db, True)
+
+        return dic
+
 
 scanned = 0
 updated = 0
@@ -83,8 +127,6 @@ def insert_item(db, platform_id: int, levels: Dict, item: CourseItem):
             """
 
         crs.execute(raw_insert_text, raw_insertable.data)
-
-
         db.commit()
 
     global inserted
@@ -102,7 +144,7 @@ def update_item(db, course_id: int, levels: Dict[str, int], item: CourseItem):
 
     raw_update_text = f"""
         UPDATE {raw_table()}
-        SET ({raw_upd.columns_str()}) = ({raw_upd.placeholders()})
+        SET {raw_upd.columns_str()} = {raw_upd.placeholders()}
         WHERE course_id = %s
         """
 
@@ -117,9 +159,9 @@ def update_item(db, course_id: int, levels: Dict[str, int], item: CourseItem):
 
 def process_item(db, platform_id: int, levels: Dict[str, int], item: CourseItem):
     select_text = f"""
-        SELECT m.id, m.duration, r.title, r.description, level_id, plan
-        FROM {Config.DB_METADATA_TABLE} m
-        JOIN {Config.DB_RAW_TABLE} r ON r.course_id = m.id 
+        SELECT m.id, m.duration, r.title, r.description, level_id, program
+        FROM {meta_table()} m
+        JOIN {raw_table()} r ON r.course_id = m.id 
         WHERE url = %s
         """
 
@@ -133,18 +175,19 @@ def process_item(db, platform_id: int, levels: Dict[str, int], item: CourseItem)
     if course is None:
         return insert_item(db, platform_id, levels, item)
 
-    course_id, duration, title, description, level_id, plan = course
+    course_id, duration, title, description, level_id, program = course
+    print(f'{course_id=}, {duration=}, {title=}, {program=}')
     if      duration    != item["estimated_duration"]   or \
             description != item["description"]          or \
             level_id    != levels[item["entry_level"]]  or \
-            plan        != item["education_plan"]:
+            program     != item["education_plan"]:
         update_item(db, course_id, levels, item)
 
 
 def main():
     db = init_db()
     platform_id = get_platform_id(db)
-    levels: Dict[str, int] = get_levels_ids(db)
+    levels = get_levels_ids(db)
     crawl(lambda item: process_item(db, platform_id, levels, item))
     db.close()
 

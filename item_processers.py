@@ -1,8 +1,5 @@
-import re
 from typing import List, Any, Dict, Tuple
-
 from course_crawler.items import CourseItem
-
 
 def get_duration(dur_ru: str) -> str:
     return dur_ru.split(' ')[0] + " hours"
