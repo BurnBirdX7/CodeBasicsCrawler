@@ -116,9 +116,8 @@ def update_item(db, course_id: int, levels: Dict[str, int], item: CourseItem):
 
 
 def process_item(db, platform_id: int, levels: Dict[str, int], item: CourseItem):
-    # TODO: Update select process
     select_text = f"""
-        SELECT m.id, m.duration, r.title, r.description, entry_level, plan
+        SELECT m.id, m.duration, r.title, r.description, level_id, plan
         FROM {Config.DB_METADATA_TABLE} m
         JOIN {Config.DB_RAW_TABLE} r ON r.course_id = m.id 
         WHERE url = %s
@@ -132,16 +131,13 @@ def process_item(db, platform_id: int, levels: Dict[str, int], item: CourseItem)
     scanned += 1
 
     if course is None:
-        insert_item(db, platform_id, levels, item)
-        return
+        return insert_item(db, platform_id, levels, item)
 
-    course_id, duration, description, entry_level, plan = course
-
-    # TODO: Make more general
-    if duration != item["estimated_duration"]  or \
-            description != item["description"] or \
-            entry_level != item["entry_level"] or \
-            plan != item["education_plan"]:
+    course_id, duration, title, description, level_id, plan = course
+    if      duration    != item["estimated_duration"]   or \
+            description != item["description"]          or \
+            level_id    != levels[item["entry_level"]]  or \
+            plan        != item["education_plan"]:
         update_item(db, course_id, levels, item)
 
 

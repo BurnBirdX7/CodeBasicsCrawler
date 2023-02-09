@@ -4,6 +4,10 @@ from typing import List, Any, Dict, Tuple
 from course_crawler.items import CourseItem
 
 
+def get_duration(dur_ru: str) -> str:
+    return dur_ru.split(' ')[0] + " hours"
+
+
 class Insertable:
     def __init__(self, columns: List[str], data: List[Any]):
         self.columns = columns
@@ -40,7 +44,7 @@ def insertable_meta_from_item(item: CourseItem, levels: Dict[str, int]) -> Inser
 
     data = [
         item['url'],
-        re.search(r'\d+', item.estimated_duration),
+        get_duration(item['estimated_duration']),
         levels[item['entry_level']]
     ]
 
@@ -58,7 +62,7 @@ class Updatable(Insertable):
 def updatables_from_item(item: CourseItem, id: int, levels: Dict[str, int]) -> Tuple[Updatable, Updatable]:
     meta_columns = ["duration", "level_id"]
     meta_data = [
-        re.search(r'\d+', item.estimated_duration),
+        get_duration(item['estimated_duration']),
         levels[item['entry_level']]
     ]
 
