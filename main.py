@@ -4,9 +4,9 @@ load_dotenv()
 from scrapy.crawler import CrawlerProcess
 from course_crawler.spiders.CodeBasics import CourseSpider
 
-import psycopg2
-from config import Config
-
+from db_helpers import *
+from item_processers import *
+from typing import Dict
 
 def crawl(callback):
     collection = []
@@ -17,88 +17,110 @@ def crawl(callback):
 
     return collection
 
-def init_db():
-    return psycopg2.connect(user=Config.DB_USER,
-                            password=Config.DB_PASSWORD,
-                            host=Config.DB_HOST,
-                            port=Config.DB_PORT,
-                            database=Config.DB_NAME)
-
 
 def get_platform_id(db):
-
-    select_text = f"""
+    SELECT_TEXT = f"""
     SELECT id
-    FROM {Config.DB_SOURCE_TABLE}
+    FROM {table(Config.DB_SOURCE_TABLE)}
     WHERE url = %s
     """
 
+    INSERT_TEXT = f"""
+    INSERT INTO {table(Config.DB_SOURCE_TABLE)} (url)
+    VALUES (%s)
+    RETURNING id
+    """
+
     with db.cursor() as crs:
-        crs.execute(select_text, [Config.PLATFORM_URL])
-        lst = crs.fetchone()
-        print(lst[0])
-        return lst[0]
+        crs.execute(SELECT_TEXT, [Config.PLATFORM_URL])
+        packed_id = crs.fetchone()
+
+        if packed_id is not None:
+            print(packed_id[0])
+            return packed_id[0]
+
+    # If platform wasn't found - insert it
+    with db.cursor() as crs:
+        crs.execute(INSERT_TEXT, (Config.PLATFORM_URL,))
+        packed_id = crs.fetchone()[0]
+        if packed_id is not None:
+            db.commit()
+            return packed_id[0]
+
+        raise RuntimeError(f'Cannot acquire ID of the platform with \'{Config.PLATFORM_URL}\' url')
+
+
+def get_levels_ids(db) -> Dict[str, int]:
+    pass # TODO: Implement
 
 scanned = 0
 updated = 0
 inserted = 0
 
-def push_item(db, platform_id, item):
-    insertable = [
-        item[key] for key in ("url",
-                              "title",
-                              "long_title",
 
-                              "description",
-                              "education_plan",
-                              "estimated_duration",
+def insert_item(db, platform_id: int, levels: Dict, item: CourseItem):
+    raw_insertable = insertable_raw_from_item(item)
 
-                              "entry_level") # cost, platform
-    ]
-
-    insertable.append(platform_id)
+    meta_insertable = insertable_meta_from_item(item, levels)
+    meta_insertable.append('source_id', platform_id)
 
     with db.cursor() as crs:
-        insert_text = f"""
-        INSERT INTO {Config.DB_COURSE_TABLE} (
-            url, subject, title,
-            description, plan, estimated_duration,
-            entry_level, cost, platform_id
-            )
-        VALUES (%s, %s, %s,
-                %s, %s, %s,
-                %s, 0,  %s)
-        """
+        meta_insert_text = f"""
+            INSERT INTO {meta_table()} ({meta_insertable.columns_str()})
+            VALUES ({meta_insertable.placeholders()})
+            RETURNING id
+            """
 
-        crs.execute(insert_text, insertable)
+        crs.execute(meta_insert_text, meta_insertable.data)
+        packed_id = crs.fetchone()
+        if packed_id is None:
+            raise RuntimeError('Cannot insert course into meta-information table')
+
+        raw_insertable.append('course_id', packed_id[0])
+        raw_insert_text = f"""
+            INSERT INTO {raw_table()} ({raw_insertable.columns_str()})
+            VALUES ({raw_insertable.placeholders()})
+            """
+
+        crs.execute(raw_insert_text, raw_insertable.data)
+
+
         db.commit()
 
     global inserted
     inserted += 1
 
 
-def update_item(db, course_id, item):
-    updatable = [item[key] for key in ("estimated_duration", "entry_level", "education_plan")]
+def update_item(db, course_id: int, levels: Dict[str, int], item: CourseItem):
+    meta_upd, raw_upd = updatables_from_item(item, course_id, levels)
 
-    updatable.append(course_id)
+    meta_update_text = f"""
+        UPDATE {meta_table()}
+        SET ({meta_upd.columns_str()}) = ({meta_upd.placeholders()})
+        WHERE id = %s
+        """
 
-    update_text = f"""
-                UPDATE {Config.DB_COURSE_TABLE}
-                SET (estimated_duration, entry_level, plan) = (%s, %s, %s)
-                WHERE id = %s
-                """
+    raw_update_text = f"""
+        UPDATE {raw_table()}
+        SET ({raw_upd.columns_str()}) = ({raw_upd.placeholders()})
+        WHERE course_id = %s
+        """
 
     with db.cursor() as crs:
-        crs.execute(update_text, updatable)
+        crs.execute(meta_update_text, meta_upd.data)
+        crs.execute(raw_update_text, raw_upd.data)
         db.commit()
 
     global updated
     updated += 1
 
-def process_item(db, platform_id, item):
+
+def process_item(db, platform_id: int, levels: Dict[str, int], item: CourseItem):
+    # TODO: Update select process
     select_text = f"""
-        SELECT id, estimated_duration, description, entry_level, plan
-        FROM {Config.DB_COURSE_TABLE}
+        SELECT m.id, m.duration, r.title, r.description, entry_level, plan
+        FROM {Config.DB_METADATA_TABLE} m
+        JOIN {Config.DB_RAW_TABLE} r ON r.course_id = m.id 
         WHERE url = %s
         """
 
@@ -110,7 +132,7 @@ def process_item(db, platform_id, item):
     scanned += 1
 
     if course is None:
-        push_item(db, platform_id, item)
+        insert_item(db, platform_id, levels, item)
         return
 
     course_id, duration, description, entry_level, plan = course
@@ -120,13 +142,14 @@ def process_item(db, platform_id, item):
             description != item["description"] or \
             entry_level != item["entry_level"] or \
             plan != item["education_plan"]:
-        update_item(db, course_id, item)
+        update_item(db, course_id, levels, item)
 
 
 def main():
     db = init_db()
     platform_id = get_platform_id(db)
-    crawl(lambda item: process_item(db, platform_id, item))
+    levels: Dict[str, int] = get_levels_ids(db)
+    crawl(lambda item: process_item(db, platform_id, levels, item))
     db.close()
 
     global inserted, updated, scanned
@@ -134,6 +157,7 @@ def main():
     print(f'{inserted=}')
     print(f'{updated=}')
     print(f'{scanned=}')
+
 
 if __name__ == '__main__':
     main()
