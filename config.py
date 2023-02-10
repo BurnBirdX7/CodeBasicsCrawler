@@ -1,14 +1,15 @@
 from os import getenv
 
+
 class Config:
-    # Connection info
+    # DB connection info
     DB_HOST = 'localhost'
     DB_PORT = '5432'
     DB_USER = 'postgres'
     DB_PASSWORD = getenv('DB_PASSWORD')
     DB_NAME = 'platform'
 
-    #
+    # Defines how platform is represented in the DB
     PLATFORM_URL = 'https://code-basics.com/ru'
 
     # Schema and Table names
