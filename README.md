@@ -16,11 +16,11 @@ python3 -m pip install scrapy psycopg2 python-dotenv
 
 ## Запуск
 
-Сбор данных с платформы CodeBasics и обновление БД
-
 ```shell
-python3 main.py
+scrapy crawl CodeBasics
 ```
+
+Сбор данных с платформы CodeBasics и обновление БД
 
 Чтобы подключиться к базе данных нужно описать конфигурацию в `config.py`.\
 С конфигурацией по умолчанию пароль для БД можно задать через переменную окружения `DB_PASSWORD`

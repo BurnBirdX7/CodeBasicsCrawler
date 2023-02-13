@@ -2,15 +2,11 @@ import scrapy
 from course_crawler.items import CourseItem
 
 
-class CourseSpider(scrapy.Spider):
+class CodeBasicsSpider(scrapy.Spider):
     name = 'CodeBasics'
     allowed_domains = ['code-basics.com']
     start_urls = ['https://code-basics.com/ru/language_categories/programming',
                   'https://code-basics.com/ru/language_categories/layouting']
-
-    def __init__(self, callback, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.callback = callback
 
     def parse(self, response):
         main_block = response.xpath('//main')
@@ -47,5 +43,4 @@ class CourseSpider(scrapy.Spider):
         else:
             item['entry_level'] = 'Middle'
 
-        self.callback(item)
         return item

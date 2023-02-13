@@ -1,7 +1,8 @@
 from typing import List, Any, Dict, Tuple
 from course_crawler.items import CourseItem
 
-def get_duration(dur_ru: str) -> str:
+def duration_ru2en(dur_ru: str) -> str:
+    # Always expects hours
     return dur_ru.split(' ')[0] + " hours"
 
 
@@ -10,16 +11,24 @@ class Insertable:
         self.columns = columns
         self.data = data
 
-    def columns_str(self) -> str:
+    def column_headers(self) -> str:
         return ', '.join([f'"{s}"' for s in self.columns])
 
-    def placeholders(self) -> str:
+    def column_placeholders(self) -> str:
         return ', '.join(['%s' for _ in range(len(self.columns))])
 
     def append(self, column: str, value: Any):
         self.columns.append(column)
         self.data.append(value)
 
+    def request(self, table: str, additional: str = ''):
+        text = f"""
+        INSERT INTO {table} ({self.column_headers()})
+        VALUES ({self.column_placeholders()})
+        {additional}
+        """
+
+        return text
 
 def insertable_raw_from_item(item: CourseItem) -> Insertable:
     columns = ['title', 'section_title', 'description', 'program']
@@ -41,7 +50,7 @@ def insertable_meta_from_item(item: CourseItem, levels: Dict[str, int]) -> Inser
 
     data = [
         item['url'],
-        get_duration(item['estimated_duration']),
+        duration_ru2en(item['estimated_duration']),
         levels[item['entry_level']]
     ]
 
@@ -55,11 +64,26 @@ class Updatable(Insertable):
     def append_id(self, id: int):
         self.data.append(id)
 
+    def request(self, table: str, where = 'id = %s', additional: str = ''):
+        if len(self.columns) > 1:
+            OP = '('
+            CL = ')'
+        else:
+            OP = ''
+            CL = ''
+
+        return f"""
+        UPDATE {table}
+        SET {OP + self.column_headers() + CL} = {OP + self.column_placeholders() + CL}
+        WHERE {where}
+        {additional}
+        """
+
 
 def updatables_from_item(item: CourseItem, id: int, levels: Dict[str, int]) -> Tuple[Updatable, Updatable]:
     meta_columns = ["duration", "level_id"]
     meta_data = [
-        get_duration(item['estimated_duration']),
+        duration_ru2en(item['estimated_duration']),
         levels[item['entry_level']]
     ]
 

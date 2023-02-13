@@ -1,5 +1,6 @@
 from os import getenv
-
+import dotenv
+dotenv.load_dotenv()
 
 class Config:
     # DB connection info
