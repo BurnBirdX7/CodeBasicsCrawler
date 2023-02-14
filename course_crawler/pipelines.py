@@ -1,13 +1,14 @@
 # Don't forget to add your pipeline to the ITEM_PIPELINES setting
 # See: https://docs.scrapy.org/en/latest/topics/item-pipeline.html
+import datetime
 
 from db_helpers import *
 from typing import Dict
 
 class CodeBasicsPipeline:
 
-    def log(self, text):
-        print(f"\t>>>> PIPLINE: {text}")
+    def log(self, text, no_new_line:bool=False):
+        print(f"\t>>>> PIPELINE: {text}", end=(' ' if no_new_line else '\n'))
 
     def __init__(self):
         self.db:          psycopg2.connection   | None = None
@@ -17,6 +18,7 @@ class CodeBasicsPipeline:
         self.scanned:  int = 0
         self.inserted: int = 0
         self.updated:  int = 0
+        self.uptodate:  int = 0
 
     def open_spider(self, spider):
         self.db = init_db()
@@ -29,45 +31,43 @@ class CodeBasicsPipeline:
         self.log("DB connection's closed")
         self.log(f"Scanned: {self.scanned},"
                  f"Inserted: {self.inserted},"
-                 f"Updated: {self.updated}")
+                 f"Updated: {self.updated}, "
+                 f"Up to date: {self.uptodate}")
 
     def process_item(self, item, spider):
-        self.log("Item processed")
+        self.log("Processing item...", True)
         self._process_item(item)
         self.scanned += 1
         return item
 
     def insert_item(self, item: CourseItem):
-        raw_insertable = insertable_raw_from_item(item)
+        raw_insertable = insertable_raw_from_item(item, raw_table())
 
-        meta_insertable = insertable_meta_from_item(item, self.levels)
-        meta_insertable.append('source_id', self.platform_id)
+        meta_insertable = insertable_meta_from_item(item, meta_table(), self.levels)
+        meta_insertable.append_column('source_id', self.platform_id)
+        meta_insertable.append_additional("RETURNING id")
 
         with self.db.cursor() as crs:
-            meta_insert_text = meta_insertable.request(meta_table(), "RETURNING id")
-            crs.execute(meta_insert_text, meta_insertable.data)
+            crs.execute(meta_insertable.request(), meta_insertable.data)
 
             packed_id = crs.fetchone()
             if packed_id is None:
                 raise RuntimeError('Cannot insert course into meta-information table')
 
-            raw_insertable.append('course_id', packed_id[0])
+            raw_insertable.append_column('course_id', packed_id[0])
 
-            raw_insert_text = raw_insertable.request(raw_table())
+            raw_insert_text = raw_insertable.request()
             crs.execute(raw_insert_text, raw_insertable.data)
             self.db.commit()
 
         self.inserted += 1
 
     def update_item(self, course_id: int, item: CourseItem):
-        meta_upd, raw_upd = updatables_from_item(item, course_id, self.levels)
-
-        meta_update_text = meta_upd.request(meta_table())
-        raw_update_text = raw_upd.request(raw_table(), "course_id = %s")
+        meta_upd, raw_upd = updatables_from_item(item, meta_table(), raw_table(), course_id, self.levels)
 
         with self.db.cursor() as crs:
-            crs.execute(meta_update_text, meta_upd.data)
-            crs.execute(raw_update_text, raw_upd.data)
+            crs.execute(meta_upd.request(), meta_upd.data)
+            crs.execute(raw_upd.request(), raw_upd.data)
             self.db.commit()
 
         self.updated += 1
@@ -85,13 +85,22 @@ class CodeBasicsPipeline:
             course = crs.fetchone()
 
         if course is None:
+            print("Inserting...")
+            self.log(f"NEW: {item}")
             return self.insert_item(item)
 
         course_id, duration, title, description, level_id, program = course
-        print(f'{course_id=}, {duration=}, {title=}, {program=}')
+        duration: datetime.timedelta
+        duration = f'{int(duration.total_seconds() / 3600)} hours'
         if duration != item["estimated_duration"] or \
                 description != item["description"] or \
                 level_id != self.levels[item["entry_level"]] or \
                 program != item["education_plan"]:
             self.update_item(course_id, item)
+            print("Updating...")
+            self.log(f'OLD: {course_id=}, {duration=}, {title=}, {program=}')
+            self.log(f'NEW: {item}')
+        else:
+            print('Up to date')
+            self.uptodate += 1
 

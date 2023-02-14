@@ -1,5 +1,6 @@
 import scrapy
 from course_crawler.items import CourseItem
+from typing import Iterable
 
 
 class CodeBasicsSpider(scrapy.Spider):
@@ -7,6 +8,15 @@ class CodeBasicsSpider(scrapy.Spider):
     allowed_domains = ['code-basics.com']
     start_urls = ['https://code-basics.com/ru/language_categories/programming',
                   'https://code-basics.com/ru/language_categories/layouting']
+
+    @staticmethod
+    def duration2en(dur_ru: str) -> str:
+        # Always expects hours
+        return dur_ru.split(' ')[0] + " hours"
+
+    @staticmethod
+    def education_plan2str(plan: Iterable[str]) -> str:
+        return '[' + ', '.join(map(lambda s: f'"{s}"', plan)) + ']'
 
     def parse(self, response):
         main_block = response.xpath('//main')
@@ -33,10 +43,10 @@ class CodeBasicsSpider(scrapy.Spider):
         item['description'] = container.xpath('//p/text()').get()
 
         item['cost'] = container.xpath('//*[contains(@class, "badge")]/text()').get()
-        item['estimated_duration'] = container.xpath('*//span[1]/text()').get()
+        item['estimated_duration'] = CodeBasicsSpider.duration2en(container.xpath('*//span[1]/text()').get())
 
         plan_selector = response.xpath('/html/body/main/div/div/div[2]/div[not(contains(@class, "mt-5"))]')
-        item['education_plan'] = plan_selector.xpath('div/ul/li/a/text()').getall()
+        item['education_plan'] = CodeBasicsSpider.education_plan2str(plan_selector.xpath('div/ul/li/a/text()').getall())
 
         if not long_title.startswith(title) or long_title.endswith('начинающих'):
             item['entry_level'] = 'Basic'

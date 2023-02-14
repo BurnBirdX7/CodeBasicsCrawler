@@ -5,10 +5,10 @@ dotenv.load_dotenv()
 class Config:
     # DB connection info
     DB_HOST = 'localhost'
-    DB_PORT = '5432'
     DB_USER = 'postgres'
+    DB_PORT = getenv('DB_PORT')
     DB_PASSWORD = getenv('DB_PASSWORD')
-    DB_NAME = 'platform'
+    DB_NAME = getenv('DB_NAME')
 
     # Defines how platform is represented in the DB
     PLATFORM_URL = 'https://code-basics.com/ru'

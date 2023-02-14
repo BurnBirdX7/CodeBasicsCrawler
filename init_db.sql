@@ -29,8 +29,8 @@ CREATE TABLE courses.course_metadata (
 	price_currency varchar NULL,
 	duration interval NULL,
 	CONSTRAINT course_metadata_pk PRIMARY KEY (id),
-	CONSTRAINT course_metadata_source_fk FOREIGN KEY (source_id) REFERENCES courses."source"(id),
-	CONSTRAINT course_metadata_level_fk FOREIGN KEY (level_id) REFERENCES courses."level"(id)
+	CONSTRAINT course_metadata_source_fk FOREIGN KEY (source_id) REFERENCES courses."source"(id) ON DELETE CASCADE ,
+	CONSTRAINT course_metadata_level_fk FOREIGN KEY (level_id) REFERENCES courses."level"(id) ON DELETE CASCADE
 );
 
 
@@ -43,7 +43,7 @@ CREATE TABLE courses.course_raw (
 	"program" varchar NULL,
 	course_keys varchar NULL,
 	CONSTRAINT course_raw_pk PRIMARY KEY (course_id),
-	CONSTRAINT course_raw_metadata_fk FOREIGN KEY (course_id) REFERENCES courses.course_metadata(id)
+	CONSTRAINT course_raw_metadata_fk FOREIGN KEY (course_id) REFERENCES courses.course_metadata(id) ON DELETE CASCADE
 );
 
 
@@ -54,5 +54,5 @@ CREATE TABLE courses.reviews (
 	author varchar NULL,
 	"date" timestamp NULL,
 	CONSTRAINT reviews_pk PRIMARY KEY (id),
-	CONSTRAINT reviews_metadata_fk FOREIGN KEY (course_id) REFERENCES courses.course_metadata(id)
+	CONSTRAINT reviews_metadata_fk FOREIGN KEY (course_id) REFERENCES courses.course_metadata(id) ON DELETE CASCADE
 );

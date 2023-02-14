@@ -57,11 +57,9 @@ def get_platform_id(db):
 
 
 def insert_level(db, level: str):
-    insertable = Insertable(['text'], [level])
-    insert_text = insertable.request(levels_table(), 'ON CONFLICT DO NOTHING')
-
+    insertable = Insertable(levels_table(), ['text'], [level])
     with db.cursor() as crs:
-        crs.execute(insert_text, insertable.data)
+        crs.execute(insertable.request(), insertable.data)
         db.commit()
 
 
