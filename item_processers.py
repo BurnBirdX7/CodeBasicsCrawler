@@ -1,3 +1,4 @@
+import datetime
 from typing import List, Any, Dict, Tuple
 from course_crawler.items import CourseItem
 
@@ -86,12 +87,13 @@ def insertable_raw_from_item(item: CourseItem, table: str) -> Insertable:
 
 
 def insertable_meta_from_item(item: CourseItem, table:str, levels: Dict[str, int]) -> Insertable:
-    columns = ['url', 'duration', 'level_id']
+    columns = ['url', 'duration', 'level_id', 'last_update']
 
     data = [
         item['url'],
         item['estimated_duration'],
-        levels[item['entry_level']]
+        levels[item['entry_level']],
+        datetime.datetime.now()
     ]
 
     return Insertable(table, columns, data)
@@ -99,10 +101,11 @@ def insertable_meta_from_item(item: CourseItem, table:str, levels: Dict[str, int
 # Updatable
 
 def updatables_from_item(item: CourseItem, meta_table: str, raw_table: str, id: int, levels: Dict[str, int]) -> Tuple[Updatable, Updatable]:
-    meta_columns = ["duration", "level_id"]
+    meta_columns = ["duration", "level_id", "last_update"]
     meta_data = [
         item['estimated_duration'],
-        levels[item['entry_level']]
+        levels[item['entry_level']],
+        datetime.datetime.now()
     ]
 
     meta_updatable = Updatable(meta_table, meta_columns, meta_data)

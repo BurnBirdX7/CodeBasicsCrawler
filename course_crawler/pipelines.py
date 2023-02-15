@@ -18,7 +18,7 @@ class CodeBasicsPipeline:
         self.scanned:  int = 0
         self.inserted: int = 0
         self.updated:  int = 0
-        self.uptodate:  int = 0
+        self.uptodate: int = 0
 
     def open_spider(self, spider):
         self.db = init_db()
@@ -52,7 +52,7 @@ class CodeBasicsPipeline:
 
             packed_id = crs.fetchone()
             if packed_id is None:
-                raise RuntimeError('Cannot insert course into meta-information table')
+                raise RuntimeError(f'Cannot insert course into meta-information table [{meta_table()}]')
 
             raw_insertable.append_column('course_id', packed_id[0])
 
@@ -85,8 +85,7 @@ class CodeBasicsPipeline:
             course = crs.fetchone()
 
         if course is None:
-            print("Inserting...")
-            self.log(f"NEW: {item}")
+            print(f"Inserting... [title={item['title']}, url={item['url']}]")
             return self.insert_item(item)
 
         course_id, duration, title, description, level_id, program = course
@@ -97,9 +96,7 @@ class CodeBasicsPipeline:
                 level_id != self.levels[item["entry_level"]] or \
                 program != item["education_plan"]:
             self.update_item(course_id, item)
-            print("Updating...")
-            self.log(f'OLD: {course_id=}, {duration=}, {title=}, {program=}')
-            self.log(f'NEW: {item}')
+            print(f"Updating... [{course_id=}, {title=}]")
         else:
             print('Up to date')
             self.uptodate += 1
