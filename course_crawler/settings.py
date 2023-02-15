@@ -12,7 +12,7 @@ BOT_NAME = 'course_crawler'
 SPIDER_MODULES = ['course_crawler.spiders']
 NEWSPIDER_MODULE = 'course_crawler.spiders'
 
-LOG_LEVEL = 'INFO'
+LOG_LEVEL = 'WARNING'
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'course_crawler (+http://www.yourdomain.com)'

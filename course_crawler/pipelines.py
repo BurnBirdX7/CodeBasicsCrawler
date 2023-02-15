@@ -8,7 +8,7 @@ from typing import Dict
 class CodeBasicsPipeline:
 
     def log(self, text, no_new_line:bool=False):
-        print(f"\t>>>> PIPELINE: {text}", end=(' ' if no_new_line else '\n'))
+        print(f" > PIPELINE > : {text}", end=(' ' if no_new_line else '\n'))
 
     def __init__(self):
         self.db:          psycopg2.connection   | None = None
@@ -22,9 +22,9 @@ class CodeBasicsPipeline:
 
     def open_spider(self, spider):
         self.db = init_db()
+        self.log("DB connection's initialized")
         self.platform_id = get_platform_id(self.db)
         self.levels = get_levels_ids(self.db)
-        self.log("DB connection's initialized")
 
     def close_spider(self, spider):
         self.db.close()

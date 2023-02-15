@@ -42,7 +42,7 @@ def get_platform_id(db):
         packed_id = crs.fetchone()
 
         if packed_id is not None:
-            print('platform id:', packed_id[0])
+            print(f'DB -> platform_id={packed_id[0]}')
             return packed_id[0]
 
     # If platform wasn't found - insert it
@@ -64,7 +64,6 @@ def insert_level(db, level: str):
 
 
 def get_levels_ids(db, nested: bool = False) -> Dict[str, int]:
-    print('levels:')
     select_text = f"""
     SELECT id, text
     FROM {levels_table()}
@@ -79,7 +78,7 @@ def get_levels_ids(db, nested: bool = False) -> Dict[str, int]:
 
         dic = {}
         for id, text in rows:
-            print(f'{id=}, {text=}')
+            print(f'DB -> [entry level] {id=}, {text=}')
             if text == Config.LEVEL_BASIC:
                 dic['Basic'] = id
             elif text == Config.LEVEL_MIDDLE:
